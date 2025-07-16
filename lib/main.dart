@@ -1,17 +1,19 @@
 // main.dart
 import 'package:botellas/adds/ad_manager.dart';
+import 'package:botellas/class/environment.dart';
 import 'package:botellas/screens/home_screen.dart';
 import 'package:botellas/screens/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'; // Import for kIsWeb
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart'; // Import for Google Mobile Ads
 import 'firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
 
 Future<void> main() async {
-  WidgetsFlutterBinding
-      .ensureInitialized(); // Ensure Flutter binding is initialized
+  WidgetsFlutterBinding.ensureInitialized(); // Ensure Flutter binding is initialized
+  await dotenv.load(fileName: Environment.fileName); 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );

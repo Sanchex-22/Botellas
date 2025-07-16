@@ -1,12 +1,8 @@
 // ad_manager.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart'; // Import for kIsWeb and defaultTargetPlatform
-import 'package:google_mobile_ads/google_mobile_ads.dart'; // Import for Google Mobile Ads
-
-/// Define a test ad unit ID for Interstitial Ads.
-/// You should replace this with your actual ad unit ID.
-/// For iOS, use 'ca-app-pub-3940256099942544/4414707907'
-const String testInterstitialAdUnitId = 'ca-app-pub-3940256099942544/1033173712';
+import 'package:flutter/foundation.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // Importa flutter_dotenv
 
 /// A class to manage the loading and showing of Google Mobile Ads (Interstitial and App Open).
 class AdManager {
@@ -15,40 +11,43 @@ class AdManager {
   bool _isShowingAd = false;
   DateTime? _lastAdShownTime;
 
-  /// Constructor for AdManager.
-  /// No need to initialize MobileAds.instance here, as it's done globally in main.dart.
   AdManager() {
-    // Optionally load an App Open Ad on initialization if desired,
-    // but the original logic loads it on app resume if not already loaded.
-    // _loadAppOpenAd();
+    // No es necesario cargar el .env aquí, ya se hace en main.dart
+  }
+
+  /// Returns the appropriate Interstitial Ad Unit ID from environment variables.
+  String get _interstitialAdUnitId {
+    // Accede a la variable de entorno
+    return dotenv.env['TEST_INTERSTITIAL_AD_UNIT_ID'] ?? 'ca-app-pub-3940256099942544/1033173712';
   }
 
   /// Returns the appropriate App Open Ad Unit ID based on the platform.
   String get _appOpenAdUnitId {
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'ca-app-pub-2116089172655720/7019833718'; // Android test ID
+      // Accede a la variable de entorno para Android
+      return dotenv.env['TEST_APP_OPEN_AD_UNIT_ID_ANDROID'] ?? 'ca-app-pub-2116089172655720/7019833718';
     } else if (defaultTargetPlatform == TargetPlatform.iOS) {
-      return 'ca-app-pub-2116089172655720/8336198081'; // iOS test ID
+      // Accede a la variable de entorno para iOS
+      return dotenv.env['TEST_APP_OPEN_AD_UNIT_ID_IOS'] ?? 'ca-app-pub-2116089172655720/8336198081';
     }
     return ''; // Return empty if not Android or iOS
   }
 
   /// Loads an Interstitial Ad.
   void _loadInterstitialAd() {
-    // Only load if not on web, as MobileAds is not initialized for web.
     if (kIsWeb) {
       debugPrint('Interstitial ads are not supported on web.');
       return;
     }
 
     InterstitialAd.load(
-      adUnitId: testInterstitialAdUnitId,
+      adUnitId: _interstitialAdUnitId, // Usa el getter para obtener el ID
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
         onAdLoaded: (InterstitialAd ad) {
           debugPrint('$ad loaded.');
           _interstitialAd = ad;
-          _showInterstitialAd(); // Show immediately after loading, as per original logic
+          _showInterstitialAd();
         },
         onAdFailedToLoad: (LoadAdError error) {
           debugPrint('InterstitialAd failed to load: $error');
@@ -70,16 +69,16 @@ class AdManager {
           debugPrint('$ad onAdShowedFullScreenContent.'),
       onAdDismissedFullScreenContent: (InterstitialAd ad) {
         debugPrint('$ad onAdDismissedFullScreenContent.');
-        ad.dispose(); // Dispose the ad after it's dismissed
-        _interstitialAd = null; // Clear the reference
+        ad.dispose();
+        _interstitialAd = null;
       },
       onAdFailedToShowFullScreenContent: (InterstitialAd ad, AdError error) {
         debugPrint('$ad onAdFailedToShowFullScreenContent: $error');
-        ad.dispose(); // Dispose the ad if it fails to show
-        _interstitialAd = null; // Clear the reference
+        ad.dispose();
+        _interstitialAd = null;
       },
     );
-    _interstitialAd!.show(); // Show the ad
+    _interstitialAd!.show();
   }
 
   /// Public method to trigger the loading and showing of an Interstitial Ad.
@@ -89,7 +88,6 @@ class AdManager {
 
   /// Loads an App Open Ad.
   void _loadAppOpenAd() {
-    // Only load if not on web.
     if (kIsWeb) {
       debugPrint('App Open ads are not supported on web.');
       return;
@@ -111,7 +109,7 @@ class AdManager {
         },
         onAdFailedToLoad: (error) {
           print('AppOpenAd falló al cargar: $error');
-          _appOpenAd = null; // Ensure the ad is cleaned if load fails
+          _appOpenAd = null;
         },
       ),
     );
@@ -121,55 +119,49 @@ class AdManager {
   void _showAppOpenAd() {
     if (_appOpenAd == null) {
       print('AppOpenAd: No hay anuncio cargado para mostrar.');
-      _loadAppOpenAd(); // Try to load a new one
+      _loadAppOpenAd();
       return;
     }
 
     _appOpenAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdShowedFullScreenContent: (ad) {
         _isShowingAd = true;
-        _lastAdShownTime =
-            DateTime.now(); // Record the time the ad was shown
+        _lastAdShownTime = DateTime.now();
         print('AppOpenAd mostrado en pantalla completa.');
       },
       onAdDismissedFullScreenContent: (ad) {
         _isShowingAd = false;
-        ad.dispose(); // Release resources of the shown ad
-        _appOpenAd = null; // Clear the reference
-        _loadAppOpenAd(); // Load the next ad for the next time
+        ad.dispose();
+        _appOpenAd = null;
+        _loadAppOpenAd();
         print('AppOpenAd cerrado.');
       },
       onAdFailedToShowFullScreenContent: (ad, error) {
         _isShowingAd = false;
-        ad.dispose(); // Release resources of the failed ad
-        _appOpenAd = null; // Clear the reference
-        _loadAppOpenAd(); // Try to load the next ad
+        ad.dispose();
+        _appOpenAd = null;
+        _loadAppOpenAd();
         print('AppOpenAd falló al mostrar: $error');
       },
     );
-    _appOpenAd!.show(); // Show the ad
+    _appOpenAd!.show();
   }
 
   /// Handles changes in the app's lifecycle state, specifically for App Open Ads.
   void handleAppLifecycleStateChange(AppLifecycleState state) {
-    // Only handle if not on web.
     if (kIsWeb) {
       return;
     }
 
     if (state == AppLifecycleState.resumed) {
-      // If the app comes back to the foreground
       if (_appOpenAd != null && !_isShowingAd) {
-        // Only show the ad if enough time has passed since the last one was shown
         if (_lastAdShownTime == null ||
             DateTime.now().difference(_lastAdShownTime!).inMinutes >= 1) {
-          // Show every 1 minute
           _showAppOpenAd();
         } else {
           print('AppOpenAd: Demasiado pronto para mostrar otro anuncio.');
         }
       } else if (_appOpenAd == null) {
-        // If no ad is loaded, try to load one
         _loadAppOpenAd();
       }
     }
