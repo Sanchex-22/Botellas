@@ -1,6 +1,6 @@
 // login_screen.dart
+import 'package:botellas/screens/home_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:botellas/screens/home_screen.dart'; // Importa tu HomeScreen
 
 /// Pantalla de inicio de sesión que permite al usuario loguearse o entrar como invitado.
 class LoginScreen extends StatefulWidget {
