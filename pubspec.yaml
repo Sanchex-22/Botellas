@@ -1,0 +1,27 @@
+name: botellas
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ">=2.17.0 <3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flame: ^1.8.0
+  intl: ^0.20.2
+  cupertino_icons: ^1.0.2
+  firebase_core: ^3.15.1
+  firebase_auth: ^5.6.2
+  google_mobile_ads: ^6.0.0
+  cloud_firestore: ^5.6.11
+  google_sign_in: ^7.0.0
+  shared_preferences: ^2.0.15
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
