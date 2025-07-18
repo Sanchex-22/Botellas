@@ -61,6 +61,29 @@ class Botella {
       if (specialEffects != null) 'specialEffects': specialEffects,
     };
   }
+  Botella copyWith({
+    String? id,
+    String? userId,
+    String? message,
+    String? ocean,
+    Timestamp? timestamp,
+    int? likes,
+    int? repliesCount,
+    bool? isPremium,
+    int? views,
+  }) {
+    return Botella(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      message: message ?? this.message,
+      ocean: ocean ?? this.ocean,
+      timestamp: timestamp ?? this.timestamp,
+      likes: likes ?? this.likes,
+      repliesCount: repliesCount ?? this.repliesCount,
+      isPremium: isPremium ?? this.isPremium,
+      views: views ?? this.views, emoji: '',
+    );
+  }
 }
 
 // --- Modelo para la Colección 'usuarios' ---

@@ -1,0 +1,69 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+  
+  	function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Función auxiliar para verificar si el usuario es anónimo
+    function isAnonymous() {
+      return request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    // Reglas para la colección 'usuarios'
+    // Todos los usuarios autenticados (incluidos los anónimos) pueden leer cualquier perfil.
+    // Los usuarios (autenticados, incluidos los anónimos) pueden crear su propio perfil.
+    // Solo los usuarios NO anónimos pueden actualizar o eliminar su propio perfil.
+    match /usuario/{userId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update, delete: if request.auth != null && request.auth.uid == userId && !isAnonymous();
+    }
+
+    // Reglas para la colección 'botellas'
+    // Todos los usuarios autenticados (incluidos los anónimos) pueden leer cualquier botella.
+    // Todos los usuarios autenticados (incluidos los anónimos) pueden crear botellas,
+    // asegurándose de que el 'userId' en la botella coincida con su UID.
+    // Solo los usuarios NO anónimos pueden actualizar o eliminar sus propias botellas.
+    match /botellas/{bottleId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid && !isAnonymous();
+    }
+
+    // Reglas para la subcolección 'respuestas' dentro de 'botellas'
+    // Todos los usuarios autenticados (incluidos los anónimos) pueden leer respuestas.
+    // Todos los usuarios autenticados (incluidos los anónimos) pueden crear respuestas.
+    // Solo los usuarios NO anónimos pueden actualizar o eliminar sus propias respuestas.
+    match /botellas/{bottleId}/respuestas/{replyId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid && !isAnonymous();
+    }
+
+    // Reglas para la subcolección 'likes' dentro de 'botellas'
+    // Todos los usuarios autenticados (incluidos los anónimos) pueden leer los likes.
+    // Todos los usuarios autenticados (incluidos los anónimos) pueden crear o eliminar
+    // su propio 'like' (asegurando que el ID del documento 'like' sea su UID).
+    match /botellas/{bottleId}/likes/{likeId} {
+      allow read: if request.auth != null;
+      allow create, delete: if request.auth != null && request.auth.uid == likeId;
+    }
+
+    // Reglas para las subcolecciones 'following' y 'followers' dentro de 'usuarios'
+    // Todos los usuarios autenticados (incluidos los anónimos) pueden leer estas listas.
+    // Solo los usuarios NO anónimos pueden escribir (modificar) sus propias listas de seguimiento/seguidores.
+    // Nota: La lógica de "seguir" a otro usuario que implica escribir en el documento de otro
+    // usuario generalmente se maneja mejor con Cloud Functions para mayor seguridad.
+    match /usuario/{userId}/{subcollection=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId && !isAnonymous();
+    }
+
+    match /metadata_oceanos/{oceanId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+  }
+}

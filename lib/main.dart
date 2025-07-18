@@ -62,7 +62,6 @@ class _MainAppState extends State<MainApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: "Botellas",
       debugShowCheckedModeBanner: true,
       theme: ThemeData(
           primarySwatch: Colors.blue,
