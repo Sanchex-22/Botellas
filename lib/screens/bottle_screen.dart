@@ -13,7 +13,6 @@ class CreateBottleScreen extends StatefulWidget {
 
 class _CreateBottleScreenState extends State<CreateBottleScreen> {
   final TextEditingController _messageController = TextEditingController();
-  // String? _selectedEmoji; // Eliminado: Ya no necesitamos seleccionar un emoji
   String? _selectedOceanId; // Usaremos el ID del océano (que es su nombre)
   List<OceanoMetadata> _oceans = []; // Lista de océanos disponibles
   bool _isLoading = false;
@@ -24,21 +23,11 @@ class _CreateBottleScreenState extends State<CreateBottleScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Lista de emojis predefinidos para "Tipo de botella" - ELIMINADA
-  // final List<String> _bottleEmojis = [
-  //   '💙', '✨', '🌙', '☀️', '✉️', '🦋', '🌸', '🌿', '⚡', '💎'
-  // ];
-
   @override
   void initState() {
     super.initState();
     _loadOceans(); // Cargar la lista de océanos al iniciar la pantalla
     _messageController.addListener(_updateMessageCharCount);
-
-    // MODIFICACIÓN: Pre-seleccionar el primer emoji si la lista no está vacía - ELIMINADO
-    // if (_bottleEmojis.isNotEmpty) {
-    //   _selectedEmoji = _bottleEmojis.first;
-    // }
   }
 
   @override
@@ -101,7 +90,6 @@ class _CreateBottleScreenState extends State<CreateBottleScreen> {
     }
 
     if (_messageController.text.trim().isEmpty ||
-        // _selectedEmoji == null || // Eliminado: Ya no verificamos _selectedEmoji
         _selectedOceanId == null) {
       setState(() {
         _errorMessage = 'Por favor, completa todos los campos.';
@@ -132,7 +120,13 @@ class _CreateBottleScreenState extends State<CreateBottleScreen> {
         specialEffects: null, // Puedes añadir lógica para esto más tarde
       );
 
+      // Guarda la botella en Firestore
       await _firestore.collection('botellas').add(newBottle.toFirestore());
+
+      // INCREMENTA EL CONTADOR DE BOTELLAS ENVIADAS EN EL PERFIL DEL USUARIO
+      await _firestore.collection('usuarios').doc(user.uid).update({
+        'bottlesSent': FieldValue.increment(1),
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Botella enviada exitosamente!')),

@@ -1,9 +1,9 @@
 // profile_screen.dart
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Importa Firestore
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:botellas/screens/login_screen.dart'; // Importa la pantalla de login
-import 'package:botellas/models/firestore_models.dart'; // Importa tu modelo Usuario
+import 'package:botellas/screens/login_screen.dart';
+import 'package:botellas/models/firestore_models.dart'; // Asegúrate de que esta ruta sea correcta y el modelo Usuario esté actualizado
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -14,28 +14,18 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance; // Instancia de Firestore
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   Usuario? _userProfile;
   List<Botella> _userBottles = [];
-  bool _isLoading = true;
-  String _errorMessage = '';
 
-  @override
-  void initState() {
-    super.initState();
-    _loadUserProfileAndBottles(); // Cargar perfil y botellas
-  }
-
-  /// Maneja la lógica para cerrar la sesión del usuario.
   Future<void> _handleLogout() async {
     try {
       await _auth.signOut();
-      // Navegar de vuelta a la pantalla de login y remover todas las rutas anteriores
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => const LoginScreen()),
-        (Route<dynamic> route) => false, // Elimina todas las rutas de la pila
+        (Route<dynamic> route) => false,
       );
     } catch (e) {
       print('Error al cerrar sesión: $e');
@@ -45,66 +35,337 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  /// Carga el perfil del usuario y sus botellas desde Firestore.
-  Future<void> _loadUserProfileAndBottles() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-    });
-
-    try {
-      final user = _auth.currentUser;
-      if (user == null) {
-        setState(() {
-          _errorMessage = 'No hay usuario autenticado.';
-          _isLoading = false;
-        });
-        return;
-      }
-
-      // 1. Cargar el perfil del usuario
-      final userDoc = await _firestore.collection('usuarios').doc(user.uid).get();
-      if (userDoc.exists) {
-        _userProfile = Usuario.fromFirestore(userDoc);
-      } else {
-        // Si el perfil no existe, crea uno básico
-        _errorMessage = 'Perfil de usuario no encontrado. Creando uno básico...';
-        _userProfile = Usuario(
-          id: user.uid,
-          name: user.isAnonymous ? 'Invitado-${user.uid.substring(0, 4)}' : (user.email?.split('@')[0] ?? 'Nuevo Usuario'),
-          avatarEmoji: '⚓', // Emoji por defecto
-          isPremiumSubscriber: false,
-          premiumCrown: false,
-          lastActivity: Timestamp.now(),
-        );
-        await _firestore.collection('usuarios').doc(user.uid).set(_userProfile!.toFirestore());
-        _errorMessage = ''; // Limpia el mensaje de error si se creó con éxito
-      }
-
-      // 2. Cargar las botellas del usuario
-      final bottlesSnapshot = await _firestore
-          .collection('botellas')
-          .where('userId', isEqualTo: user.uid)
-          .get();
-
-      _userBottles = bottlesSnapshot.docs
-          .map((doc) => Botella.fromFirestore(doc))
-          .toList();
-
-      // Ordenar las botellas por timestamp de forma descendente (más recientes primero)
-      _userBottles.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-
-    } catch (e) {
-      _errorMessage = 'Error al cargar los datos: $e';
-      print('Error al cargar datos del perfil: $e');
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+  // Skeleton loading básico
+  Widget _buildSkeleton() {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Cargando Perfil...')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Container(width: 100, height: 100, decoration: BoxDecoration(color: Colors.grey[300], shape: BoxShape.circle)),
+            const SizedBox(height: 16),
+            Container(height: 20, width: 150, color: Colors.grey[300]),
+            const SizedBox(height: 8),
+            Container(height: 14, width: 200, color: Colors.grey[300]),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: List.generate(4, (index) => Container(height: 40, width: 60, color: Colors.grey[300])),
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: ListView.builder(
+                itemCount: 3,
+                itemBuilder: (_, __) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Container(height: 80, color: Colors.grey[300]),
+                ),
+              ),
+            )
+          ],
+        ),
+      ),
+    );
   }
 
-  // Función auxiliar para formatear números grandes (ej. 1500 -> 1.5K)
+  @override
+  Widget build(BuildContext context) {
+    final user = _auth.currentUser;
+    if (user == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Perfil')),
+        body: const Center(child: Text('No hay usuario autenticado.')),
+      );
+    }
+
+    // Stream con converter para Usuario
+    final userProfileStream = _firestore
+        .collection('usuarios')
+        .doc(user.uid)
+        .withConverter<Usuario>(
+          fromFirestore: (snap, _) => Usuario.fromFirestore(snap),
+          toFirestore: (usuario, _) => usuario.toFirestore(),
+        )
+        .snapshots();
+
+    // Stream con converter para Botella
+    final userBottlesStream = _firestore
+        .collection('botellas')
+        .where('userId', isEqualTo: user.uid)
+        .orderBy('timestamp', descending: true)
+        .withConverter<Botella>(
+          fromFirestore: (snap, _) => Botella.fromFirestore(snap),
+          toFirestore: (botella, _) => botella.toFirestore(),
+        )
+        .snapshots();
+
+    return StreamBuilder<DocumentSnapshot<Usuario>>(
+      stream: userProfileStream,
+      builder: (context, userSnapshot) {
+        if (userSnapshot.connectionState == ConnectionState.waiting) {
+          return _buildSkeleton();
+        }
+        if (userSnapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Error en Perfil')),
+            body: Center(child: Text('Error: ${userSnapshot.error}')),
+          );
+        }
+        if (!userSnapshot.hasData || !userSnapshot.data!.exists) {
+          // Puedes decidir crear perfil básico aquí o mostrar error
+          return Scaffold(
+            appBar: AppBar(title: const Text('Perfil No Disponible')),
+            body: const Center(child: Text('Perfil no encontrado.')),
+          );
+        }
+
+        _userProfile = userSnapshot.data!.data();
+
+        // Si _userProfile es nulo aquí, algo salió mal en el fromFirestore o el documento no existe.
+        // Se añade una comprobación adicional para evitar errores de null safety.
+        if (_userProfile == null) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Perfil Vacío')),
+            body: const Center(child: Text('Los datos del perfil no se pudieron cargar.')),
+          );
+        }
+
+        return StreamBuilder<QuerySnapshot<Botella>>(
+          stream: userBottlesStream,
+          builder: (context, bottlesSnapshot) {
+            if (bottlesSnapshot.connectionState == ConnectionState.waiting) {
+              return _buildSkeleton();
+            }
+            if (bottlesSnapshot.hasError) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('Error en Botellas')),
+                body: Center(child: Text('Error: ${bottlesSnapshot.error}')),
+              );
+            }
+            _userBottles = bottlesSnapshot.data!.docs.map((doc) => doc.data()).toList();
+
+            // CALCULAR LA SUMA DE LIKES DE TODAS LAS BOTELLAS DEL USUARIO
+            final int totalHeartsReceived = _userBottles.fold(0, (sum, bottle) => sum + bottle.likes);
+
+            // UI normal con datos cargados
+            return Scaffold(
+              appBar: AppBar(
+                centerTitle: true,
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.logout, color: Colors.white),
+                    onPressed: _handleLogout,
+                    tooltip: 'Cerrar Sesión',
+                  ),
+                ],
+              ),
+              extendBodyBehindAppBar: true,
+              body: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.only(top: 80.0, bottom: 20.0),
+                      width: double.infinity,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.blueAccent, Colors.lightBlueAccent],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          CircleAvatar(
+                            radius: 50,
+                            backgroundColor: Colors.white,
+                            child: Text(
+                              _userProfile!.avatarEmoji,
+                              style: const TextStyle(fontSize: 40),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            _userProfile!.name,
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            'Navegando océanos de emociones',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.white.withOpacity(0.8),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            user.email ?? 'Usuario Invitado',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.white.withOpacity(0.7),
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          // Aquí se usan los campos del modelo Usuario
+                          _buildStatColumn(_formatNumber(_userBottles.length), 'Botellas'), // Muestra la cantidad de botellas del usuario
+                          _buildStatColumn(_formatNumber(totalHeartsReceived), 'Corazones'), // Usa la suma calculada de likes
+                          _buildStatColumn(_formatNumber(_userProfile!.followingCount), 'Siguiendo'),
+                          _buildStatColumn(_formatNumber(_userProfile!.followersCount), 'Seguidores'),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                    if (!_userProfile!.isPremiumSubscriber)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                        child: Card(
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.emoji_events, color: Colors.amber, size: 30),
+                                const SizedBox(width: 15),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: const [
+                                      Text(
+                                        'Hazte Premium',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Navega océanos exclusivos',
+                                        style: TextStyle(fontSize: 14, color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    print('Botón Mejorar presionado');
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.orange,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                  ),
+                                  child: const Text('Mejorar', style: TextStyle(fontSize: 16)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 30),
+                    DefaultTabController(
+                      length: 2,
+                      child: Column(
+                        children: [
+                          TabBar(
+                            labelColor: Colors.blueAccent,
+                            unselectedLabelColor: Colors.grey,
+                            indicatorColor: Colors.blueAccent,
+                            tabs: const [
+                              Tab(icon: Icon(Icons.message), text: 'Mis Botellas'),
+                              Tab(icon: Icon(Icons.bar_chart), text: 'Estadísticas'),
+                            ],
+                          ),
+                          SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.5,
+                            child: TabBarView(
+                              children: [
+                                _userBottles.isEmpty
+                                    ? const Center(child: Text('Aún no has enviado ninguna botella.'))
+                                    : ListView.builder(
+                                          padding: const EdgeInsets.all(16.0),
+                                          itemCount: _userBottles.length,
+                                          itemBuilder: (context, index) {
+                                            final bottle = _userBottles[index];
+                                            return Card(
+                                              margin: const EdgeInsets.only(bottom: 15),
+                                              elevation: 2,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                              child: Padding(
+                                                padding: const EdgeInsets.all(16.0),
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        const Icon(Icons.waves, color: Colors.blueAccent, size: 18),
+                                                        const SizedBox(width: 5),
+                                                        Text(
+                                                          bottle.ocean,
+                                                          style: const TextStyle(
+                                                            fontWeight: FontWeight.bold,
+                                                            color: Colors.blueAccent,
+                                                          ),
+                                                        ),
+                                                        const Spacer(),
+                                                        Text(
+                                                          _formatTimestamp(bottle.timestamp),
+                                                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    const SizedBox(height: 10),
+                                                    Text(
+                                                      bottle.message,
+                                                      style: const TextStyle(fontSize: 16),
+                                                    ),
+                                                    const SizedBox(height: 10),
+                                                    Row(
+                                                      children: [
+                                                        _buildStatIcon(Icons.favorite_border, bottle.likes),
+                                                        _buildStatIcon(Icons.chat_bubble_outline, bottle.repliesCount),
+                                                        _buildStatIcon(Icons.remove_red_eye, bottle.views),
+                                                        _buildStatIcon(Icons.share, 0),
+                                                      ],
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                const Center(child: Text('Aquí irían las estadísticas detalladas del usuario.')),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   String _formatNumber(int number) {
     if (number >= 1000000) {
       return '${(number / 1000000).toStringAsFixed(1)}M';
@@ -114,7 +375,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return number.toString();
   }
 
-  // Widget auxiliar para las columnas de estadísticas
   Widget _buildStatColumn(String value, String label) {
     return Column(
       children: [
@@ -136,7 +396,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Widget auxiliar para los iconos de estadísticas de la botella
   Widget _buildStatIcon(IconData icon, int count) {
     return Padding(
       padding: const EdgeInsets.only(right: 15.0),
@@ -153,7 +412,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Función para formatear el timestamp a un formato legible
   String _formatTimestamp(Timestamp timestamp) {
     final DateTime date = timestamp.toDate();
     final Duration diff = DateTime.now().difference(date);
@@ -171,281 +429,5 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } else {
       return 'Ahora';
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Cargando Perfil...')),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (_errorMessage.isNotEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Error en Perfil')),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, color: Colors.red, size: 50),
-                const SizedBox(height: 10),
-                Text(
-                  _errorMessage,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.red, fontSize: 16),
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: _loadUserProfileAndBottles, // Reintentar cargar perfil y botellas
-                  child: const Text('Reintentar'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    // Si no hay perfil de usuario (ej. error inesperado o no se pudo crear)
-    if (_userProfile == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Perfil No Disponible')),
-        body: const Center(
-          child: Text('No se pudo cargar la información del perfil.'),
-        ),
-      );
-    }
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Perfil'),
-        centerTitle: true,
-        backgroundColor: Colors.transparent, // Fondo transparente para AppBar
-        elevation: 0, // Sin sombra
-        actions: [
-          // Botón de cerrar sesión en la AppBar
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: _handleLogout,
-            tooltip: 'Cerrar Sesión',
-          ),
-        ],
-      ),
-      extendBodyBehindAppBar: true, // Extiende el body detrás de la AppBar
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Sección superior del perfil
-            Container(
-              padding: const EdgeInsets.only(top: 80.0, bottom: 20.0), // Ajustar padding superior para no chocar con AppBar
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.blueAccent, Colors.lightBlueAccent],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-              ),
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Colors.white,
-                    child: Text(
-                      _userProfile!.avatarEmoji,
-                      style: const TextStyle(fontSize: 40),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    _userProfile!.name,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    'Navegando océanos de emociones', // Descripción fija o de un campo del modelo
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.white.withOpacity(0.8),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  // Muestra el correo del usuario (o "Usuario Invitado") debajo del nombre/descripción
-                  Text(
-                    _auth.currentUser?.email ?? 'Usuario Invitado',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.white.withOpacity(0.7),
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Estadísticas
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildStatColumn(
-                      _formatNumber(_userProfile!.bottlesSent), 'Botellas'),
-                  _buildStatColumn(
-                      _formatNumber(_userProfile!.heartsReceived), 'Corazones'),
-                  _buildStatColumn(
-                      _formatNumber(_userProfile!.followingCount), 'Siguiendo'),
-                  _buildStatColumn(
-                      _formatNumber(_userProfile!.followersCount), 'Seguidores'),
-                ],
-              ),
-            ),
-            const SizedBox(height: 30),
-
-            // Sección Hazte Premium
-            if (!_userProfile!.isPremiumSubscriber) // Solo muestra si no es premium
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                child: Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.emoji_events, color: Colors.amber, size: 30),
-                        const SizedBox(width: 15),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text(
-                                'Hazte Premium',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                'Navega océanos exclusivos',
-                                style: TextStyle(fontSize: 14, color: Colors.grey),
-                              ),
-                            ],
-                          ),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            print('Botón Mejorar presionado');
-                            // Aquí iría la lógica para la suscripción premium
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange, // Color naranja para el botón
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                          ),
-                          child: const Text('Mejorar', style: TextStyle(fontSize: 16)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            const SizedBox(height: 30),
-
-            // Pestañas Mis Botellas / Estadísticas
-            DefaultTabController(
-              length: 2,
-              child: Column(
-                children: [
-                  TabBar(
-                    labelColor: Colors.blueAccent,
-                    unselectedLabelColor: Colors.grey,
-                    indicatorColor: Colors.blueAccent,
-                    tabs: const [
-                      Tab(icon: Icon(Icons.message), text: 'Mis Botellas'),
-                      Tab(icon: Icon(Icons.bar_chart), text: 'Estadísticas'),
-                    ],
-                  ),
-                  SizedBox(
-                    height: MediaQuery.of(context).size.height * 0.5, // Ajusta la altura según sea necesario
-                    child: TabBarView(
-                      children: [
-                        // Contenido de Mis Botellas
-                        _userBottles.isEmpty
-                            ? const Center(child: Text('Aún no has enviado ninguna botella.'))
-                            : ListView.builder(
-                                padding: const EdgeInsets.all(16.0),
-                                itemCount: _userBottles.length,
-                                itemBuilder: (context, index) {
-                                  final bottle = _userBottles[index];
-                                  return Card(
-                                    margin: const EdgeInsets.only(bottom: 15),
-                                    elevation: 2,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(16.0),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Icon(Icons.waves, color: Colors.blueAccent, size: 18),
-                                              const SizedBox(width: 5),
-                                              Text(
-                                                bottle.ocean,
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.blueAccent,
-                                                ),
-                                              ),
-                                              const Spacer(),
-                                              Text(
-                                                _formatTimestamp(bottle.timestamp),
-                                                style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 10),
-                                          Text(
-                                            bottle.message,
-                                            style: const TextStyle(fontSize: 16),
-                                          ),
-                                          const SizedBox(height: 10),
-                                          Row(
-                                            children: [
-                                              _buildStatIcon(Icons.favorite_border, bottle.likes),
-                                              _buildStatIcon(Icons.chat_bubble_outline, bottle.repliesCount),
-                                              _buildStatIcon(Icons.remove_red_eye, bottle.views),
-                                              _buildStatIcon(Icons.share, 0), // No hay campo para compartir en el modelo
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                        // Contenido de Estadísticas
-                        const Center(child: Text('Aquí irían las estadísticas detalladas del usuario.')),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

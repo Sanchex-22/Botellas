@@ -65,80 +65,90 @@ class _HomeState extends State<HomeScreen> {
   }
 
   // Widget auxiliar para construir los elementos de la barra de navegación inferior
-  Widget _buildNavItem(IconData icon, String label, int index) {
-    final bool isSelected = _selectedIndex == index;
-    return Material( // Usar Material para el efecto de "splash" al tocar
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _onItemTapped(index),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                color: isSelected ? Colors.blueAccent : Colors.black54, // Colores según el diseño
-              ),
-              Text(
+Widget _buildNavItem(IconData icon, String label, int index) {
+  final bool isSelected = _selectedIndex == index;
+  return Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: () => _onItemTapped(index),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0), // Reducido de 12.0 a 4.0
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 20, // reduce ligeramente el tamaño si deseas
+              color: isSelected ? Colors.blueAccent : Colors.black54,
+            ),
+            SizedBox(
+              width: double.infinity, // asegura ancho completo dentro de Expanded
+              child: Text(
                 label,
+                overflow: TextOverflow.ellipsis, // añade ellipsis si no cabe
+                softWrap: false, // no hace wrap
+                textAlign: TextAlign.center, // centra el texto
                 style: TextStyle(
-                  color: isSelected ? Colors.blueAccent : Colors.black54, // Colores según el diseño
-                  fontSize: 12,
+                  color: isSelected ? Colors.blueAccent : Colors.black54,
+                  fontSize: 10, // reduce ligeramente para caber
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
+
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column( // Usamos Column para apilar el contenido principal y el banner
-        children: [
-          Expanded(
-            child: _widgetOptions[_selectedIndex], // Muestra el contenido de la pestaña seleccionada
-          ),
-          // Muestra el banner ad aquí, encima de la barra de navegación inferior
-          if (_isBannerAdLoaded && _adBanner.getBannerAdWidget() != null && _adBanner.adSize != null)
-            Container(
-              alignment: Alignment.center,
-              width: _adBanner.adSize!.width.toDouble(),
-              height: _adBanner.adSize!.height.toDouble(),
-              child: _adBanner.getBannerAdWidget(),
-            ),
-        ],
-      ),
-      // El FloatingActionButton y floatingActionButtonLocation se eliminan porque el botón '+' ahora está dentro del BottomAppBar
-      bottomNavigationBar: BottomAppBar(
-        // Se eliminan shape y notchMargin ya que el FAB está integrado en el Row
-        color: Colors.white, // Fondo blanco para la barra de navegación
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: <Widget>[
-            Expanded(child: _buildNavItem(Icons.waves, 'Océano', 0)),
-            Expanded(child: _buildNavItem(Icons.mail_outline, 'Recibir', 1)),
-            // Botón central de añadir (simulando un FAB)
-            Expanded(
-              child: Center(
-                child: SizedBox( // Usamos SizedBox para controlar el tamaño del "FAB" integrado
-                  width: 56.0, // Tamaño estándar de un FAB
-                  height: 56.0,
-                  child: RawMaterialButton( // Usamos RawMaterialButton para mayor control de estilo
-                    onPressed: _onFabPressed,
-                    elevation: 2.0, // Elevación para simular el FAB
-                    fillColor: Colors.blueAccent, // Color de fondo
-                    shape: const CircleBorder(), // Forma circular
-                    child: const Icon(Icons.add, color: Colors.white, size: 24.0),
-                  ),
-                ),
+      body: _widgetOptions[_selectedIndex], // Usa solo el contenido como body
+      bottomNavigationBar: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Banner Ad
+            if (_isBannerAdLoaded &&
+                _adBanner.getBannerAdWidget() != null &&
+                _adBanner.adSize != null)
+              Container(
+                alignment: Alignment.center,
+                width: _adBanner.adSize!.width.toDouble(),
+                height: _adBanner.adSize!.height.toDouble(),
+                child: _adBanner.getBannerAdWidget(),
               ),
-            ),
-            Expanded(child: _buildNavItem(Icons.star_outline, 'Premium', 2)), // Nuevo item para Premium
-            Expanded(child: _buildNavItem(Icons.person_outline, 'Perfil', 3)),
+            // BottomAppBar
+            BottomAppBar(
+                color: Colors.white,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: <Widget>[
+                    Expanded(child: _buildNavItem(Icons.waves, 'Océano', 0)),
+                    Expanded(
+                        child: _buildNavItem(Icons.mail_outline, 'Recibir', 1)),
+                    SizedBox(
+                      width: 56.0,
+                      height: 56.0,
+                      child: RawMaterialButton(
+                        onPressed: _onFabPressed,
+                        elevation: 2.0,
+                        fillColor: Colors.blueAccent,
+                        shape: const CircleBorder(),
+                        child: const Icon(Icons.add,
+                            color: Colors.white, size: 24.0),
+                      ),
+                    ),
+                    Expanded(
+                        child: _buildNavItem(Icons.star_outline, 'Premium', 2)),
+                    Expanded(
+                        child:
+                            _buildNavItem(Icons.person_outline, 'Perfil', 3)),
+                  ],
+                )),
           ],
         ),
       ),
