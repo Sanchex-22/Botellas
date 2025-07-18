@@ -412,22 +412,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  String _formatTimestamp(Timestamp timestamp) {
-    final DateTime date = timestamp.toDate();
-    final Duration diff = DateTime.now().difference(date);
+String _formatTimestamp(Timestamp? timestamp) {
+  if (timestamp == null) return 'Sin fecha';
 
-    if (diff.inDays > 365) {
-      return '${(diff.inDays / 365).floor()}a';
-    } else if (diff.inDays > 30) {
-      return '${(diff.inDays / 30).floor()}m';
-    } else if (diff.inDays > 0) {
-      return '${diff.inDays}d';
-    } else if (diff.inHours > 0) {
-      return '${diff.inHours}h';
-    } else if (diff.inMinutes > 0) {
-      return '${diff.inMinutes}min';
-    } else {
-      return 'Ahora';
-    }
+  final DateTime date = timestamp.toDate();
+  final Duration diff = DateTime.now().difference(date);
+
+  if (diff.inDays > 365) {
+    return '${(diff.inDays / 365).floor()}a';
+  } else if (diff.inDays > 30) {
+    return '${(diff.inDays / 30).floor()}m';
+  } else if (diff.inDays > 0) {
+    return '${diff.inDays}d';
+  } else if (diff.inHours > 0) {
+    return '${diff.inHours}h';
+  } else if (diff.inMinutes > 0) {
+    return '${diff.inMinutes}min';
+  } else {
+    return 'Ahora';
   }
+}
+
 }

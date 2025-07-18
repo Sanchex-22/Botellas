@@ -1,10 +1,6 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-  	function isAuthenticated() {
-      return request.auth != null;
-    }
 
     // Función auxiliar para verificar si el usuario es anónimo
     function isAnonymous() {
@@ -12,58 +8,77 @@ service cloud.firestore {
     }
 
     // Reglas para la colección 'usuarios'
-    // Todos los usuarios autenticados (incluidos los anónimos) pueden leer cualquier perfil.
-    // Los usuarios (autenticados, incluidos los anónimos) pueden crear su propio perfil.
-    // Solo los usuarios NO anónimos pueden actualizar o eliminar su propio perfil.
-    match /usuario/{userId} {
+    match /usuarios/{userId} {
+      // Un usuario autenticado puede leer cualquier perfil.
       allow read: if request.auth != null;
+      // Un usuario autenticado puede crear su propio perfil.
       allow create: if request.auth != null && request.auth.uid == userId;
+      // Solo los usuarios NO anónimos pueden actualizar o eliminar su propio perfil.
       allow update, delete: if request.auth != null && request.auth.uid == userId && !isAnonymous();
+    }
+    match /usuarios/{userId}/seenBottles/{bottleId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
     // Reglas para la colección 'botellas'
-    // Todos los usuarios autenticados (incluidos los anónimos) pueden leer cualquier botella.
-    // Todos los usuarios autenticados (incluidos los anónimos) pueden crear botellas,
-    // asegurándose de que el 'userId' en la botella coincida con su UID.
-    // Solo los usuarios NO anónimos pueden actualizar o eliminar sus propias botellas.
     match /botellas/{bottleId} {
+      // Todos los usuarios autenticados (incluidos los anónimos) pueden leer cualquier botella.
       allow read: if request.auth != null;
+      // Todos los usuarios autenticados (incluidos los anónimos) pueden crear botellas,
+      // asegurándose de que el 'userId' en la botella coincida con su UID.
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid && !isAnonymous();
+
+      // Regla de actualización combinada:
+      // 1. El propietario (no anónimo) puede actualizar su propia botella (cualquier campo).
+      // 2. Cualquier usuario autenticado puede actualizar SOLO el campo 'likes' (incrementar/decrementar por 1).
+      // 3. Cualquier usuario autenticado puede actualizar SOLO el campo 'repliesCount' (incrementar por 1).
+      allow update: if request.auth != null && (
+        (resource.data.userId == request.auth.uid && !isAnonymous()) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']) &&
+         (request.resource.data.likes == resource.data.likes + 1 || request.resource.data.likes == resource.data.likes - 1)) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['repliesCount']) &&
+         request.resource.data.repliesCount == resource.data.repliesCount + 1)
+      );
+
+      // Solo los usuarios NO anónimos pueden eliminar sus propias botellas.
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid && !isAnonymous();
     }
 
     // Reglas para la subcolección 'respuestas' dentro de 'botellas'
-    // Todos los usuarios autenticados (incluidos los anónimos) pueden leer respuestas.
-    // Todos los usuarios autenticados (incluidos los anónimos) pueden crear respuestas.
-    // Solo los usuarios NO anónimos pueden actualizar o eliminar sus propias respuestas.
     match /botellas/{bottleId}/respuestas/{replyId} {
+      // Todos los usuarios autenticados (incluidos los anónimos) pueden leer respuestas.
       allow read: if request.auth != null;
+      // Todos los usuarios autenticados (incluidos los anónimos) pueden crear respuestas.
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      // Solo los usuarios NO anónimos pueden actualizar o eliminar sus propias respuestas.
       allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid && !isAnonymous();
     }
 
     // Reglas para la subcolección 'likes' dentro de 'botellas'
-    // Todos los usuarios autenticados (incluidos los anónimos) pueden leer los likes.
-    // Todos los usuarios autenticados (incluidos los anónimos) pueden crear o eliminar
-    // su propio 'like' (asegurando que el ID del documento 'like' sea su UID).
     match /botellas/{bottleId}/likes/{likeId} {
+      // Todos los usuarios autenticados (incluidos los anónimos) pueden leer los likes.
       allow read: if request.auth != null;
+      // Todos los usuarios autenticados (incluidos los anónimos) pueden crear o eliminar
+      // su propio 'like' (asegurando que el ID del documento 'like' sea su UID).
       allow create, delete: if request.auth != null && request.auth.uid == likeId;
     }
 
     // Reglas para las subcolecciones 'following' y 'followers' dentro de 'usuarios'
     // Todos los usuarios autenticados (incluidos los anónimos) pueden leer estas listas.
     // Solo los usuarios NO anónimos pueden escribir (modificar) sus propias listas de seguimiento/seguidores.
-    // Nota: La lógica de "seguir" a otro usuario que implica escribir en el documento de otro
-    // usuario generalmente se maneja mejor con Cloud Functions para mayor seguridad.
-    match /usuario/{userId}/{subcollection=**} {
+    match /usuarios/{userId}/{subcollection=**} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && request.auth.uid == userId && !isAnonymous();
     }
 
+    // Reglas para la colección 'metadata_oceanos'
+    // Permite lectura pública (cualquiera, autenticado o no).
+    // No permite escrituras desde el cliente.
     match /metadata_oceanos/{oceanId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read; // Solo lectura
+      // Si necesitas permitir la creación de nuevos océanos (por ejemplo, por un administrador),
+      // deberías añadir una regla específica para 'create' aquí, con condiciones de seguridad adecuadas.
+      // Por ejemplo: allow create: if request.auth != null && request.auth.uid == 'admin_uid';
     }
   }
 }

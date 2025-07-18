@@ -6,7 +6,7 @@ class Botella {
   final String message;
   final String emoji;
   final String ocean;
-  final Timestamp timestamp;
+  final Timestamp? timestamp; // Hacemos que timestamp sea nullable
   final String userId;
   final int likes;
   final int views;
@@ -19,7 +19,7 @@ class Botella {
     required this.message,
     required this.emoji,
     required this.ocean,
-    required this.timestamp,
+    this.timestamp, // No es requerido en el constructor si es nullable
     required this.userId,
     this.likes = 0,
     this.views = 0,
@@ -36,7 +36,7 @@ class Botella {
       message: data['message'] as String,
       emoji: data['emoji'] as String,
       ocean: data['ocean'] as String,
-      timestamp: data['timestamp'] as Timestamp,
+      timestamp: data['timestamp'] != null ? data['timestamp'] as Timestamp : null, // Leer como Timestamp?
       userId: data['userId'] as String,
       likes: (data['likes'] as num?)?.toInt() ?? 0,
       views: (data['views'] as num?)?.toInt() ?? 0,
@@ -61,10 +61,12 @@ class Botella {
       if (specialEffects != null) 'specialEffects': specialEffects,
     };
   }
+
   Botella copyWith({
     String? id,
     String? userId,
     String? message,
+    String? emoji, // Añadido el campo emoji para copyWith
     String? ocean,
     Timestamp? timestamp,
     int? likes,
@@ -76,12 +78,13 @@ class Botella {
       id: id ?? this.id,
       userId: userId ?? this.userId,
       message: message ?? this.message,
+      emoji: emoji ?? this.emoji, // Actualizado para incluir emoji
       ocean: ocean ?? this.ocean,
       timestamp: timestamp ?? this.timestamp,
       likes: likes ?? this.likes,
       repliesCount: repliesCount ?? this.repliesCount,
       isPremium: isPremium ?? this.isPremium,
-      views: views ?? this.views, emoji: '',
+      views: views ?? this.views,
     );
   }
 }
@@ -154,7 +157,7 @@ class Respuesta {
   final String id; // El ID del documento de la respuesta
   final String content;
   final String userId;
-  final Timestamp timestamp;
+  final Timestamp? timestamp;
 
   Respuesta({
     required this.id,
@@ -170,7 +173,7 @@ class Respuesta {
       id: doc.id,
       content: data['content'] as String,
       userId: data['userId'] as String,
-      timestamp: data['timestamp'] as Timestamp,
+      timestamp: data['timestamp'] is Timestamp ? data['timestamp'] as Timestamp : null,
     );
   }
 
@@ -276,3 +279,5 @@ class OceanoMetadata {
     };
   }
 }
+
+

@@ -1,4 +1,5 @@
 // for_yous_screen.dart
+import 'package:botellas/components.dart/comments_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -22,10 +23,8 @@ class _ForYousScreenState extends State<ForYousScreen> {
   bool _isLoadingInitial = true;
   bool _isLoadingMore = false;
   String? _errorMessage;
-  Set<String> _seenBottleIds =
-      {}; // IDs de botellas vistas por el usuario actual
-  bool _hasMoreBottles =
-      true; // Nuevo: Para saber si hay más botellas disponibles
+  Set<String> _seenBottleIds = {}; // IDs de botellas vistas por el usuario actual
+  bool _hasMoreBottles = true; // Nuevo: Para saber si hay más botellas disponibles
 
   DocumentSnapshot? _lastDocument; // Para paginación
 
@@ -36,10 +35,7 @@ class _ForYousScreenState extends State<ForYousScreen> {
     _pageController.addListener(() {
       // Cargar más botellas cuando el usuario llega al final de la lista actual
       // Solo cargar más si no está cargando y si hay más botellas disponibles
-      if (_pageController.position.pixels ==
-              _pageController.position.maxScrollExtent &&
-          !_isLoadingMore &&
-          _hasMoreBottles) {
+      if (_pageController.position.pixels == _pageController.position.maxScrollExtent && !_isLoadingMore && _hasMoreBottles) {
         _loadMoreBottles();
       }
     });
@@ -56,25 +52,20 @@ class _ForYousScreenState extends State<ForYousScreen> {
     setState(() {
       _isLoadingInitial = true;
       _errorMessage = null; // Reiniciar mensaje de error en carga inicial
-      _hasMoreBottles =
-          true; // Reiniciar estado de "hay más botellas" al iniciar una nueva carga
+      _hasMoreBottles = true; // Reiniciar estado de "hay más botellas" al iniciar una nueva carga
     });
 
     try {
       final user = _auth.currentUser;
       if (user == null) {
         _errorMessage = 'Usuario no autenticado.';
-        if (mounted) {
-          // Asegúrate de que el widget sigue montado antes de llamar a setState
-          setState(() {
-            _isLoadingInitial = false;
-          });
+        if (mounted) { // Asegúrate de que el widget sigue montado antes de llamar a setState
+          setState(() { _isLoadingInitial = false; });
         }
         debugPrint('ForYousScreen: Usuario es null, no se puede cargar datos.');
         return;
       }
-      debugPrint(
-          'ForYousScreen: Usuario autenticado con UID: ${user.uid}'); // Para depuración
+      debugPrint('ForYousScreen: Usuario autenticado con UID: ${user.uid}'); // Para depuración
 
       // Cargar botellas vistas por el usuario actual
       // Acceso a la colección 'usuarios' y su subcolección 'seenBottles'
@@ -88,18 +79,9 @@ class _ForYousScreenState extends State<ForYousScreen> {
 
       // Cargar metadatos de los océanos para el filtro
       // Acceso a la colección 'metadata_oceanos'
-      final oceansSnapshot =
-          await _firestore.collection('metadata_oceanos').get();
-      _oceans = oceansSnapshot.docs
-          .map((doc) => OceanoMetadata.fromFirestore(doc))
-          .toList();
-      _oceans.insert(
-          0,
-          OceanoMetadata(
-              id: 'Todos',
-              name: 'Todos',
-              isPremium: false,
-              emojiIcon: '🌍')); // Añadir opción 'Todos'
+      final oceansSnapshot = await _firestore.collection('metadata_oceanos').get();
+      _oceans = oceansSnapshot.docs.map((doc) => OceanoMetadata.fromFirestore(doc)).toList();
+      _oceans.insert(0, OceanoMetadata(id: 'Todos', name: 'Todos', isPremium: false, emojiIcon: '🌍')); // Añadir opción 'Todos'
       _selectedFilterOceanId = 'Todos'; // Por defecto, seleccionar 'Todos'
 
       await _fetchBottles(); // Obtener el conjunto inicial de botellas
@@ -107,8 +89,7 @@ class _ForYousScreenState extends State<ForYousScreen> {
       _errorMessage = 'Error al cargar datos iniciales: $e';
       print('Error al cargar datos iniciales: $e');
     } finally {
-      if (mounted) {
-        // Asegúrate de que el widget sigue montado antes de llamar a setState
+      if (mounted) { // Asegúrate de que el widget sigue montado antes de llamar a setState
         setState(() {
           _isLoadingInitial = false;
         });
@@ -120,9 +101,7 @@ class _ForYousScreenState extends State<ForYousScreen> {
   Future<void> _fetchBottles({bool isLoadMore = false}) async {
     if (isLoadMore) {
       if (mounted) {
-        setState(() {
-          _isLoadingMore = true;
-        });
+        setState(() { _isLoadingMore = true; });
       }
     } else {
       _bottles.clear(); // Limpia las botellas si no es una carga adicional
@@ -135,10 +114,7 @@ class _ForYousScreenState extends State<ForYousScreen> {
     if (user == null) {
       _errorMessage = 'Usuario no autenticado.';
       if (mounted) {
-        setState(() {
-          _isLoadingInitial = false;
-          _isLoadingMore = false;
-        });
+        setState(() { _isLoadingInitial = false; _isLoadingMore = false; });
       }
       return;
     }
@@ -153,19 +129,15 @@ class _ForYousScreenState extends State<ForYousScreen> {
 
     try {
       List<Botella> fetchedAndFilteredBottles = [];
-      const int limit =
-          25; // Número de botellas a intentar cargar por lote para mostrar
-      const int firestoreBatchLimit =
-          50; // Cuántos documentos pedir a Firestore en cada iteración (más del doble del límite para el filtrado en cliente)
+      const int limit = 25; // Número de botellas a intentar cargar por lote para mostrar
+      const int firestoreBatchLimit = 50; // Cuántos documentos pedir a Firestore en cada iteración (más del doble del límite para el filtrado en cliente)
       bool stillFetchingFromFirestore = true;
 
-      while (fetchedAndFilteredBottles.length < limit &&
-          stillFetchingFromFirestore) {
+      while (fetchedAndFilteredBottles.length < limit && stillFetchingFromFirestore) {
         QuerySnapshot<Map<String, dynamic>> snapshot;
-        Query<Map<String, dynamic>> query =
-            baseQuery.limit(firestoreBatchLimit);
+        Query<Map<String, dynamic>> query = baseQuery.limit(firestoreBatchLimit);
 
-        if (_lastDocument != null) {
+        if (_lastDocument != null) { // Only use startAfterDocument for subsequent loads
           query = query.startAfterDocument(_lastDocument!);
         }
 
@@ -201,8 +173,7 @@ class _ForYousScreenState extends State<ForYousScreen> {
 
       // Ahora, usar fetchedAndFilteredBottles para poblar _bottles
       if (!isLoadMore) {
-        _bottles
-            .clear(); // Limpiar solo si no es una operación de carga adicional
+        _bottles.clear(); // Limpiar solo si no es una operación de carga adicional
       }
 
       // Añadir las botellas recién obtenidas y filtradas a la lista principal
@@ -212,25 +183,24 @@ class _ForYousScreenState extends State<ForYousScreen> {
       // o si Firestore se quedó sin documentos, y _hasMoreBottles sigue siendo true,
       // significa que no hay más botellas que cumplan los criterios.
       if (fetchedAndFilteredBottles.length < limit && _hasMoreBottles) {
-        _hasMoreBottles = false;
+          _hasMoreBottles = false;
       }
 
-      if (_bottles.isEmpty && !isLoadMore) {
-        // Solo para el estado inicial vacío
-        _errorMessage =
-            'No hay botellas disponibles para mostrar en este momento.';
+
+      if (_bottles.isEmpty && !isLoadMore) { // Solo para el estado inicial vacío
+        _errorMessage = 'No hay botellas disponibles para mostrar en este momento.';
         _hasMoreBottles = false;
       } else {
         _errorMessage = null; // Limpiar el error si se cargan botellas
       }
+
     } catch (e) {
       // Solo establecer mensaje de error para excepciones reales
       _errorMessage = 'Error al obtener botellas: $e';
       print('Error fetching bottles: $e');
       if (mounted) {
         setState(() {
-          _hasMoreBottles =
-              false; // En caso de error, asumimos que no hay más para cargar
+          _hasMoreBottles = false; // En caso de error, asumimos que no hay más para cargar
         });
       }
     } finally {
@@ -249,44 +219,41 @@ class _ForYousScreenState extends State<ForYousScreen> {
     await _fetchBottles(isLoadMore: true);
   }
 
-  /// Marca una botella como vista en Firestore para el usuario actual y actualiza el contador de vistas global.
-  Future<void> _markBottleAsSeen(String bottleId) async {
-    if (_auth.currentUser == null || _seenBottleIds.contains(bottleId)) return;
+Future<void> _markBottleAsSeen(String bottleId) async {
+  if (_auth.currentUser == null || _seenBottleIds.contains(bottleId)) return;
 
-    try {
-      // 1. Marcar la botella como vista para el usuario actual
-      await _firestore
-          .collection('usuarios')
-          .doc(_auth.currentUser!.uid)
-          .collection('seenBottles')
-          .doc(bottleId)
-          .set({'timestamp': FieldValue.serverTimestamp()});
-      _seenBottleIds
-          .add(bottleId); // Añadir al conjunto local para evitar re-marcar
-      debugPrint('Botella $bottleId marcada como vista para el usuario.');
+  try {
+    // 1. Marcar la botella como vista para el usuario actual
+    await _firestore
+        .collection('usuarios')
+        .doc(_auth.currentUser!.uid)
+        .collection('seenBottles')
+        .doc(bottleId)
+        .set({'timestamp': FieldValue.serverTimestamp()});
 
-      // 2. Incrementar el contador de vistas global de la botella
-      await _firestore
-          .collection('botellas')
-          .doc(bottleId)
-          .update({'views': FieldValue.increment(1)});
-      debugPrint('Contador de vistas de la botella $bottleId incrementado.');
+    // 2. Incrementar el contador de vistas global de la botella
+    await _firestore
+        .collection('botellas')
+        .doc(bottleId)
+        .update({'views': FieldValue.increment(1)});
+        
+    _seenBottleIds.add(bottleId);
 
-      // Opcional: Actualizar el estado local de la botella para reflejar la nueva vista inmediatamente
-      final index = _bottles.indexWhere((b) => b.id == bottleId);
-      if (index != -1 && mounted) {
-        setState(() {
-          _bottles[index] =
-              _bottles[index].copyWith(views: _bottles[index].views + 1);
-        });
-      }
-    } catch (e) {
-      print('Error al marcar botella como vista o incrementar vistas: $e');
+    // 3. Actualizar el estado local de la botella para reflejar la nueva vista inmediatamente
+    final index = _bottles.indexWhere((b) => b.id == bottleId);
+    if (index != -1 && mounted) {
+      setState(() {
+        _bottles[index] = _bottles[index].copyWith(views: _bottles[index].views + 1);
+      });
     }
+  } catch (e) {
+    print('Error al marcar botella como vista o incrementar vistas: $e');
   }
+}
+
 
   /// Maneja el "Me gusta" de una botella.
-  Future<void> _toggleLike(String bottleId, bool currentlyLiked) async {
+  Future<void> _toggleLike(String bottleId, String bottleOwnerId, bool currentlyLiked) async {
     final user = _auth.currentUser;
     if (user == null) {
       if (mounted) {
@@ -297,40 +264,38 @@ class _ForYousScreenState extends State<ForYousScreen> {
       return;
     }
 
-    final likeDocRef = _firestore
-        .collection('botellas')
-        .doc(bottleId)
-        .collection('likes')
-        .doc(user.uid);
+    final likeDocRef = _firestore.collection('botellas').doc(bottleId).collection('likes').doc(user.uid);
     final bottleDocRef = _firestore.collection('botellas').doc(bottleId);
+    final bottleOwnerUserDocRef = _firestore.collection('usuarios').doc(bottleOwnerId); // Referencia al usuario propietario de la botella
 
     try {
       if (currentlyLiked) {
         // Quitar "Me gusta"
         await likeDocRef.delete();
-        // Solo decrementar si el contador es mayor que 0 para evitar negativos visuales
+        // Decrementar el contador de likes en la botella
         if (_bottles.firstWhere((b) => b.id == bottleId).likes > 0) {
           await bottleDocRef.update({'likes': FieldValue.increment(-1)});
         }
-        debugPrint('Unlike: $bottleId');
+        // Decrementar el contador de heartsReceived en el perfil del propietario de la botella
+        await bottleOwnerUserDocRef.update({'heartsReceived': FieldValue.increment(-1)});
+        debugPrint('Unlike: $bottleId. Hearts received for owner ${bottleOwnerId} decremented.');
       } else {
         // Dar "Me gusta"
         await likeDocRef.set({'timestamp': FieldValue.serverTimestamp()});
+        // Incrementar el contador de likes en la botella
         await bottleDocRef.update({'likes': FieldValue.increment(1)});
-        debugPrint('Like: $bottleId');
+        // Incrementar el contador de heartsReceived en el perfil del propietario de la botella
+        await bottleOwnerUserDocRef.update({'heartsReceived': FieldValue.increment(1)});
+        debugPrint('Like: $bottleId. Hearts received for owner ${bottleOwnerId} incremented.');
       }
       // Actualizar el estado local para reflejar el cambio inmediatamente
       final index = _bottles.indexWhere((b) => b.id == bottleId);
       if (index != -1 && mounted) {
         setState(() {
           if (currentlyLiked) {
-            _bottles[index] = _bottles[index].copyWith(
-                likes: (_bottles[index].likes > 0)
-                    ? _bottles[index].likes - 1
-                    : 0);
+            _bottles[index] = _bottles[index].copyWith(likes: (_bottles[index].likes > 0) ? _bottles[index].likes - 1 : 0);
           } else {
-            _bottles[index] =
-                _bottles[index].copyWith(likes: _bottles[index].likes + 1);
+            _bottles[index] = _bottles[index].copyWith(likes: _bottles[index].likes + 1);
           }
         });
       }
@@ -344,6 +309,26 @@ class _ForYousScreenState extends State<ForYousScreen> {
     }
   }
 
+  /// Maneja el clic en el botón de comentario.
+  void _handleCommentClick(String bottleId, String bottleOwnerId) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, // Permite que el modal ocupe casi toda la altura
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)), // Bordes redondeados en la parte superior
+      ),
+      builder: (context) {
+        return SizedBox(
+          height: MediaQuery.of(context).size.height * 0.85, // Ocupa el 85% de la altura de la pantalla
+          child: CommentsScreen(
+            bottleId: bottleId,
+            bottleOwnerId: bottleOwnerId,
+          ),
+        );
+      },
+    );
+  }
+
   // Widget para mostrar una botella individual (similar a un TikTok card)
   Widget _buildBottleCard(Botella bottle) {
     // Acceso a la colección 'usuarios' para obtener el perfil del remitente
@@ -355,29 +340,26 @@ class _ForYousScreenState extends State<ForYousScreen> {
         }
         if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
           // Manejar caso donde el perfil de usuario no se encuentra o hay error
-          return _buildBottleContent(bottle, 'Usuario Desconocido', '❓',
-              false); // Pasa isLiked como false por defecto
+          return _buildBottleContent(bottle, 'Usuario Desconocido', '❓', 0, 0, 0, 0, false); // Pasa isLiked como false por defecto
         }
         final userData = snapshot.data!.data() as Map<String, dynamic>;
         final userName = userData['name'] as String? ?? 'Usuario Desconocido';
         final userAvatarEmoji = userData['avatarEmoji'] as String? ?? '❓';
+        final int totalBottles = userData['bottlesSent'] as int? ?? 0; // Usar bottlesSent
+        final int totalHeartsReceived = userData['heartsReceived'] as int? ?? 0; // Usar heartsReceived
+        final int followingCount = userData['followingCount'] as int? ?? 0;
+        final int followersCount = userData['followersCount'] as int? ?? 0;
+
 
         // Obtener el estado de "Me gusta" para la botella actual
         final user = _auth.currentUser;
-        return FutureBuilder<DocumentSnapshot>(
-          future: user != null
-              ? _firestore
-                  .collection('botellas')
-                  .doc(bottle.id)
-                  .collection('likes')
-                  .doc(user.uid)
-                  .get()
-              : Future.value(null),
+        return StreamBuilder<DocumentSnapshot>( // Cambiado a StreamBuilder
+          stream: user != null ? _firestore.collection('botellas').doc(bottle.id).collection('likes').doc(user.uid).snapshots() : Stream<DocumentSnapshot>.empty(), // Usa snapshots()
           builder: (context, likeSnapshot) {
-            final bool isLiked =
-                likeSnapshot.hasData && likeSnapshot.data!.exists;
-            return _buildBottleContent(
-                bottle, userName, userAvatarEmoji, isLiked);
+            // CORRECCIÓN: Asegurarse de que likeSnapshot.data no sea null antes de acceder a .exists
+            final bool isLiked = user != null && likeSnapshot.hasData && likeSnapshot.data?.exists == true;
+            debugPrint('Bottle ID: ${bottle.id}, User ID: ${user?.uid}, isLiked: $isLiked'); // Debug print
+            return _buildBottleContent(bottle, userName, userAvatarEmoji, totalBottles, totalHeartsReceived, followingCount, followersCount, isLiked);
           },
         );
       },
@@ -385,133 +367,162 @@ class _ForYousScreenState extends State<ForYousScreen> {
   }
 
   // Contenido de la tarjeta de botella
-// Contenido de la tarjeta de botella
-Widget _buildBottleContent(
-    Botella bottle, String userName, String userAvatarEmoji, bool isLiked) {
-  return Container(
-    // Fondo con gradiente suave para un efecto de "pensamiento"
-    decoration: const BoxDecoration(
-      gradient: LinearGradient(
-        colors: [
-          Color.fromARGB(255, 255, 255, 255), // Blanco puro (sin gradiente real)
-          Color.fromARGB(255, 255, 255, 255),
-          Color.fromARGB(255, 255, 255, 255),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
+  Widget _buildBottleContent(
+      Botella bottle,
+      String userName,
+      String userAvatarEmoji,
+      int totalBottles,
+      int totalHeartsReceived, // Usar este para el perfil del remitente
+      int followingCount,
+      int followersCount,
+      bool isLiked) {
+    return Container(
+      // Fondo con gradiente suave para un efecto de "pensamiento"
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Color(0xFFE0F7FA), // Azul cielo muy claro
+            Color(0xFFF3E5F5), // Lavanda muy claro
+            Color(0xFFFFFFFF), // Blanco puro
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
       ),
-    ),
-    child: Stack(
-      alignment: Alignment.center,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(20),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor: Colors.grey[200],
-                        child: Text(
-                          userAvatarEmoji,
-                          style: const TextStyle(fontSize: 18),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundColor: Colors.grey[200],
+                          child: Text(
+                            userAvatarEmoji,
+                            style: const TextStyle(fontSize: 18),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        '@$userName',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded( // Para evitar overflow en mensajes largos
-                        child: Text(
-                          bottle.message, // Mensaje de la botella
-                          textAlign: TextAlign.center,
+                        const SizedBox(width: 10),
+                        Text(
+                          '@$userName',
                           style: const TextStyle(
-                            fontSize: 22,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: Colors.black87,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          // Para evitar overflow en mensajes largos
+                          child: Text(
+                            bottle.message, // Mensaje de la botella
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-        Positioned(
-          right: 10,
-          bottom: 80, // Ajustar para no superponerse con la BottomAppBar
-          child: Column(
-            children: [
-              // Vistas (ahora aquí)
-              _buildInteractionButton(Icons.remove_red_eye, bottle.views, () {
-                /* Lógica de Vistas (pasiva) */
-              }, false),
-              // Botón de Like con estado dinámico
+
+          // Barra lateral de interacciones (Vistas, Likes, Comentarios, Compartir, Guardar)
+          Positioned(
+            right: 10,
+            bottom: 80, // Ajustar para no superponerse con la BottomAppBar
+            child: Column(
+              children: [
+                // Vistas (ahora aquí)
               _buildInteractionButton(
-                isLiked ? Icons.favorite : Icons.favorite_border,
-                bottle.likes,
-                () => _toggleLike(bottle.id, isLiked),
-                isLiked,
-              ),
-              _buildInteractionButton(
-                Icons.comment_outlined,
-                bottle.repliesCount,
+                Icons.remove_red_eye,
+                bottle.views,
                 () {
-                  /* Lógica de Comentario */
+                  debugPrint('Views count: ${bottle.views}');
                 },
                 false,
+                null,
+                null,
               ),
-              _buildInteractionButton(Icons.share, 0, () {
-                /* Lógica de Compartir */
-              }, false),
-              _buildInteractionButton(Icons.bookmark_border, 0, () {
-                /* Lógica de Guardar */
-              }, false),
-            ],
-          ),
-        ),
-        // Hora de la botella
-        Positioned(
-          bottom: 20,
-          left: 20,
-          child: Row(
-            children: [
-              const Icon(Icons.access_time, size: 16, color: Colors.black54),
-              const SizedBox(width: 5),
-              Text(
-                _formatTimestamp(bottle.timestamp),
-                style:
-                    const TextStyle(fontSize: 14, color: Colors.black54),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
 
+                // Botón de Like con estado dinámico
+                _buildInteractionButton(
+                  isLiked ? Icons.favorite : Icons.favorite_border,
+                  bottle.likes,
+                  () => _toggleLike(bottle.id, bottle.userId,
+                      isLiked), // Pasa el userId del propietario de la botella
+                  isLiked, // Pasa el estado de "me gusta" para el color
+                  null, // No se necesita bottleId para el like
+                  null, // No se necesita bottleOwnerId para el like
+                ),
+                // Botón de Comentarios
+                _buildInteractionButton(
+                  Icons.chat_bubble_outline,
+                  bottle.repliesCount,
+                  () => _handleCommentClick(
+                      bottle.id, bottle.userId), // Llama a la nueva función
+                  false, // No es un corazón
+                  bottle.id, // Pasa el bottleId
+                  bottle.userId, // Pasa el bottleOwnerId
+                ),
+                _buildInteractionButton(Icons.share, 0, () {
+                  /* Lógica de Compartir */
+                }, false, null, null), // No es un corazón
+                _buildInteractionButton(Icons.bookmark_border, 0, () {
+                  /* Lógica de Guardar */
+                }, false, null, null), // No es un corazón
+              ],
+            ),
+          ),
+          // Hora de la botella (movida para no estar dentro del mensaje, si se desea mostrar)
+          Positioned(
+            bottom: 20,
+            left: 20,
+            child: Row(
+              children: [
+                const Icon(Icons.access_time,
+                    size: 16, color: Colors.black54), // Color oscuro
+                const SizedBox(width: 5),
+                Text(
+                  _formatTimestamp(bottle.timestamp), // Aquí está el error
+                  style: const TextStyle(
+                      fontSize: 14, color: Colors.black54), // Color oscuro
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   // Widget auxiliar para los botones de interacción
   Widget _buildInteractionButton(
-      IconData icon, int count, VoidCallback onPressed, bool isHeartLiked) {
+    IconData icon,
+    int count,
+    VoidCallback onPressed,
+    bool isHeartLiked,
+    String? bottleId, // Parámetro opcional para el ID de la botella
+    String?
+        bottleOwnerId, // Parámetro opcional para el ID del propietario de la botella
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Column(
@@ -554,7 +565,10 @@ Widget _buildBottleContent(
   }
 
   // Función para formatear el timestamp a un formato legible
-  String _formatTimestamp(Timestamp timestamp) {
+  String _formatTimestamp(Timestamp? timestamp) { // Cambiado a Timestamp?
+    if (timestamp == null) {
+      return 'Fecha desconocida'; // Maneja el caso nulo
+    }
     final DateTime date = timestamp.toDate();
     final Duration diff = DateTime.now().difference(date);
 
